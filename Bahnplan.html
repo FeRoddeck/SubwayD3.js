@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bahnplan Bochum</title>
+  <link rel="stylesheet" type="text/css" href="Bahnplan.css">
+  <script src="d3.js"></script>
+</head>
+<body>
+  <script>
+  // Breite und Höhe des SVG
+    var breite = 2200;
+    var hoehe = 2000;
+
+// Laden der externen JSON Datei und speichern der Daten in (data), damit sichergestellt wird,
+// dass die Daten zur Verfügung stehen, schließt die Funktion den rest des Codes ein
+d3.json("Bahnplan.json", function(error, data) {
+  if (error) throw error;
+
+    // Anlegen des SVG Elementes, indem die anderen Elemente gezeichnet werden
+    var svg =  d3.select("body")
+                 .append("svg")
+                 .attr("width", breite)
+                 .attr("height", hoehe)
+
+    // Die Kräftesimulation die auf den Bahnplan wirkt
+   var simulation = d3.forceSimulation(data.nodes)
+            // Übergabe der Verbindungslinien in die Simulation
+            .force("link", d3.forceLink(data.edges).iterations(7))
+            // Minimaler Abstand der Knoten
+            .force("collide", d3.forceCollide(25))
+            // Die Kräfte wirken auf alle Knoten gleich (ManyBody)
+            .force("charge", d3.forceManyBody())
+            // Die Mitte des SVG ist der Mittelpunkt der Simulation,
+            // Die Knoten erfahren eine Anziehungskraft dorthin
+            .force("center", d3.forceCenter(breite / 2, hoehe / 2))
+
+   // Die Verbindungslinien zwischen den Knoten
+   var line = svg.selectAll("line")
+                  // Assoziation mit den Daten
+                  .data(data.edges)
+                  // Fügt im DOM eine neue Linie ein
+                  .enter().append("line")
+                  // Falls in den Daten eine (CSS) Klasse vorhanden ist, wird diese übernommen
+                  .attr("class", function(d) {if (d.style != "") {return d.style;}})
+
+   // Hinzufügen einer Gruppe, dies ist nötig um die Knoten, sowie ihren Text gleichzeitig mit
+   // den Daten zu Assozieren
+   var node = svg.selectAll("g")
+       .data(data.nodes)
+       .enter().append("g")
+
+    // Hinzufügen der Knoten in die Gruppe
+    var circle = node.append("circle")
+         //.attr("class", "node")
+         .attr("class", function(d) {if (d.circleStyle != "") {return d.circleStyle;}})
+          // Der Radius der Knoten wird aus der .json übernommen
+         .attr("r", function(d) {return d.radius;})
+         // Festlegung der fixierten Knoten, dies muss über eine Funktion geschehen, um
+         // einzelne Knoten ansprechen zu können
+         .attr("cx", function(d) {if (d.x != 0) {d.fx = d.x;}})
+         .attr("cy", function(d) {if (d.y != 0) {d.fy = d.y;}})
+         // Legt das Verhalten bei der Interaktion mit den Knoten fest (ziehen mit der Maus)
+         .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended))
+
+    // Fügt der Gruppe einen Text (für den jeweiligen Knoten) hinzu
+    var text = node.append("text")
+          // Abstand zum Knoten
+         .attr("dx", function(d) {return d.radius + 5;})
+         .attr("dy", ".35em")
+         // Pointer Events werden ausgeschaltet, Text soll nicht markiert werden können
+         .attr("pointer-events", "none")
+         // Name des Knotens wird aus den Daten geholt
+         .text(function(d) { return d.name })
+         // CSS Style wird übergeben
+         .attr("class", function(d) {return d.style;})
+         .style("font-family", "Arial")
+
+    // Die Funktion ordnet in einem festen Zeitintervall den vorhanden Elementen neue Werte
+    // zu, sodass die Positionen erneuert werden
+    var ticked = function() {
+      line.attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+      circle.attr("cx", function(d) { return d.x; })
+            .attr("cy", function(d) { return d.y; });
+      text.attr("x" , function(d) { return d.x; })
+          .attr("y", function(d) {return d.y;})
+        }
+
+      // Aufrufen der "ticked" Funktion, ein "tick" ist ein von d3 festgelegter Zeitabstand
+      simulation.nodes(data.nodes)
+          .on("tick", ticked);
+
+    // Funktionen zum ziehen der Maus
+    function dragstarted(d) {
+      // Überprüft ob bereits ein Drag Event aktiv ist und startet die Simulation
+      if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(d) {
+      // die Mauspositon wird den Knoten übergeben
+      d.fx = d3.event.x;
+      d.fy = d3.event.y;
+    }
+
+    function dragended(d) {
+      // Stopt die Simulation nachdem das ziehen beendet wurde, ansonsten würde isch die Simulation je
+      // nachdem wie Knoten bewegt wurden in eine Richtung weiterbewegen
+      if (!d3.event.active) simulation.alphaTarget(0);
+      // fx und fy sind feste Position, beim beenden des ziehens, bleibt der Knoten
+      // in seiner Endlage fest verankert
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+        // Ende der JSON Funktion
+        })
+  </script>
+</body>
+</html>
